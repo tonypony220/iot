@@ -1,133 +1,85 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-# === EDIT THESE TWO TO MATCH YOUR TEAM LOGINS ===
-LOGIN1 = ENV.fetch("TEAM_LOGIN1", "alice")   # machine name #1 (must be a real teammate's login)
-LOGIN2 = ENV.fetch("TEAM_LOGIN2", "bob")     # machine name #2 (must be a real teammate's login)
-
-# Boxes: pick a stable distro. "generic/ubuntu2404" is Ubuntu 24.04 LTS.
+LOGIN1   = ENV.fetch("TEAM_LOGIN1", "mehtel")
+LOGIN2   = ENV.fetch("TEAM_LOGIN2", "mehtel2")
 BOX_NAME = "bento/ubuntu-22.04"
 
-# Your host public key (for passwordless SSH from your host into both VMs).
-# If you use a different key path, export SSH_PUB_KEY=/path/to/key.pub
-SSH_PUB_KEY = ENV.fetch("SSH_PUB_KEY", File.expand_path("~/.ssh/id_rsa.pub"))
+# Run only if explicitly requested
+RUN_SERVER = ENV.fetch("RUN_SERVER", "1").to_i != 0
+RUN_AGENT  = ENV.fetch("RUN_AGENT", "1").to_i != 0
 
-# Fixed IPs as required
-SERVER_IP = "192.168.56.110"
-AGENT_IP  = "192.168.56.111"
+SSH_PUB_KEY = ENV.fetch("SSH_PUB_KEY", File.expand_path("~/.ssh/id_ed25519.pub"))
+SERVER_IP   = "192.168.56.110"
+AGENT_IP    = "192.168.56.111"
+
+unless File.exist?(SSH_PUB_KEY)
+  abort <<~MSG
+    ERROR: SSH public key not found at #{SSH_PUB_KEY}.
+    - Create one:   ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -N ""
+    - Or export:    export SSH_PUB_KEY=/path/to/yourkey.pub
+  MSG
+end
 
 Vagrant.configure("2") do |config|
-  # Replace insecure Vagrant key with a fresh one at first boot (still key-based, no password)
   config.ssh.insert_key = true
 
-  # Shared folder for passing token/kubeconfig back to host
-  # The default /vagrant sync is enough; leaving here as a reminder.
-
-  # -------- PROVIDER TUNING (1 CPU, 1024 MB) --------
   config.vm.provider "virtualbox" do |vb|
-    vb.cpus = 1
+    vb.cpus   = 1
     vb.memory = 1024
   end
 
-  # Parallels (works well on Apple Silicon)
   config.vm.provider "parallels" do |prl|
-    prl.cpus = 1
+    prl.cpus   = 1
     prl.memory = 1024
   end
 
-  # (Optional) QEMU provider block — networking directives below are ignored by vagrant-qemu.
-  # config.vm.provider "qemu" do |qemu|
-  #   qemu.cpus = 1
-  #   qemu.memory = 1024
-  # end
-
-  # ------------- MACHINE: SERVER (controller) -------------
+  # -------- SERVER --------
   config.vm.define LOGIN1 do |srv|
-    # Hostname must end with 'S' (Server)
     srv.vm.hostname = "#{LOGIN1}S"
-    srv.vm.box = BOX_NAME
-
-    # Host-only private network with dedicated IP (VirtualBox/Parallels)
+    srv.vm.box      = BOX_NAME
     srv.vm.network "private_network", ip: SERVER_IP
 
-    # Upload your host's public key so you can SSH without password from the host
-    if File.exist?(SSH_PUB_KEY)
-      srv.vm.provision "file",
-        source: SSH_PUB_KEY,
-        destination: "/home/vagrant/host_id.pub"
+    # Drop your host pubkey on the guest; scripts will append safely.
+    srv.vm.provision "file",
+      source: SSH_PUB_KEY,
+      destination: "/tmp/host_id.pub"
+
+    srv.vm.provision "shell",
+      path: "provision/common.sh",
+      args: ["/tmp/host_id.pub"]
+
+    if RUN_SERVER
+      srv.vm.provision "shell",
+        path: "provision/server.sh",
+        args: [SERVER_IP]
+    else
+      srv.vm.provision "shell",
+        inline: "echo 'Skipping server.sh (set RUN_SERVER=1 to enable)'"
     end
-
-    srv.vm.provision "shell", privileged: true, inline: <<-SHELL
-      set -euxo pipefail
-
-      # Ensure the vagrant user's authorized_keys exists and append host public key
-      if [ -f /home/vagrant/host_id.pub ]; then
-        install -d -m 700 -o vagrant -g vagrant /home/vagrant/.ssh
-        cat /home/vagrant/host_id.pub >> /home/vagrant/.ssh/authorized_keys
-        chown vagrant:vagrant /home/vagrant/.ssh/authorized_keys
-        chmod 600 /home/vagrant/.ssh/authorized_keys
-      fi
-
-      # Basic deps (curl), then install K3s server (controller)
-      apt-get update -y
-      apt-get install -y curl
-
-      # Install K3s in server mode, advertise via the fixed IP, disable servicelb/traefik for a lean lab
-      # You can remove DISABLEs if you want the defaults.
-      export INSTALL_K3S_EXEC="server --node-ip=#{SERVER_IP} --advertise-address=#{SERVER_IP} --write-kubeconfig-mode=644 --disable servicelb --disable traefik"
-      curl -sfL https://get.k3s.io | sh -
-
-      # Wait until k3s is healthy enough to have a token
-      # (k3s installs /usr/local/bin/kubectl too)
-      until [ -f /var/lib/rancher/k3s/server/node-token ]; do sleep 2; done
-
-      # Expose the node token and kubeconfig to the shared folder so the agent/host can read them
-      cp /var/lib/rancher/k3s/server/node-token /vagrant/k3s_token
-
-      # Prepare a host-usable kubeconfig pointing to the SERVER_IP instead of 127.0.0.1
-      sed "s/127.0.0.1/#{SERVER_IP}/g" /etc/rancher/k3s/k3s.yaml > /vagrant/kubeconfig
-      chmod 600 /vagrant/kubeconfig
-    SHELL
   end
 
-  # ------------- MACHINE: AGENT (worker) -------------
+  # -------- AGENT --------
   config.vm.define LOGIN2 do |agt|
-    # Hostname must end with 'SW' (ServerWorker)
     agt.vm.hostname = "#{LOGIN2}SW"
-    agt.vm.box = BOX_NAME
-
-    # Host-only private network with dedicated IP (VirtualBox/Parallels)
+    agt.vm.box      = BOX_NAME
     agt.vm.network "private_network", ip: AGENT_IP
 
-    # Upload your host public key for passwordless SSH from host
-    if File.exist?(SSH_PUB_KEY)
-      agt.vm.provision "file",
-        source: SSH_PUB_KEY,
-        destination: "/home/vagrant/host_id.pub"
+    agt.vm.provision "file",
+      source: SSH_PUB_KEY,
+      destination: "/tmp/host_id.pub"
+
+    agt.vm.provision "shell",
+      path: "provision/common.sh",
+      args: ["/tmp/host_id.pub"]
+
+    if RUN_AGENT
+     agt.vm.provision "shell",
+       path: "provision/agent.sh",
+       args: [SERVER_IP, AGENT_IP]
+    else
+      agt.vm.provision "shell",
+        inline: "echo 'Skipping agent.sh (set RUN_AGENT=1 to enable)'"
     end
-
-    agt.vm.provision "shell", privileged: true, inline: <<-SHELL
-      set -euxo pipefail
-
-      # Ensure the vagrant user's authorized_keys exists and append host public key
-      if [ -f /home/vagrant/host_id.pub ]; then
-        install -d -m 700 -o vagrant -g vagrant /home/vagrant/.ssh
-        cat /home/vagrant/host_id.pub >> /home/vagrant/.ssh/authorized_keys
-        chown vagrant:vagrant /home/vagrant/.ssh/authorized_keys
-        chmod 600 /home/vagrant/.ssh/authorized_keys
-      fi
-
-      apt-get update -y
-      apt-get install -y curl
-
-      # Wait for server to drop the token into the shared folder
-      until [ -f /vagrant/k3s_token ]; do sleep 2; done
-      TOKEN=$(cat /vagrant/k3s_token)
-
-      # Install K3s agent, pointing to the server's fixed IP
-      export INSTALL_K3S_EXEC="agent --server https://#{SERVER_IP}:6443 --token ${TOKEN} --node-ip=#{AGENT_IP}"
-      curl -sfL https://get.k3s.io | sh -
-    SHELL
   end
 end
-

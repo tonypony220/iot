@@ -1,3 +1,5 @@
+sudo apt-get update
+sudo apt-get install net-tools
 
 setssh() {
 	# Install basic tools

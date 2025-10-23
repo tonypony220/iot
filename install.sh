@@ -1,75 +1,66 @@
-sudo apt-get update
-sudo apt-get install net-tools
+#!/usr/bin/env bash
+set -euo pipefail
 
 setssh() {
-	# Install basic tools
-	apt-get update && apt-get install -y git openssh-client
+  # Install basic tools
+  sudo apt-get update -y
+  sudo apt-get install -y git openssh-client curl ca-certificates gnupg
 
-	# Generate SSH key (skip if already exists)
-	if [ ! -f "$HOME/.ssh/id_ed25519" ]; then
-		ssh-keygen -t ed25519 -C "tony8pony@gmail.com" -f ~/.ssh/id_ed25519 -N ""
-	fi
+  # Ensure ~/.ssh exists & perms
+  mkdir -p "$HOME/.ssh"
+  chmod 700 "$HOME/.ssh"
 
-	# Start ssh-agent
-	eval "$(ssh-agent -s)"
-	ssh-add ~/.ssh/id_ed25519
+  # Generate SSH key (skip if already exists)
+  if [ ! -f "$HOME/.ssh/id_ed25519" ]; then
+    ssh-keygen -t ed25519 -C "tony8pony@gmail.com" -f "$HOME/.ssh/id_ed25519" -N ""
+  fi
 
-	# Ensure proper permissions
-	chmod 700 ~/.ssh
-	chmod 600 ~/.ssh/id_ed25519
-	chmod 644 ~/.ssh/id_ed25519.pub
+  # Start ssh-agent & add key
+  eval "$(ssh-agent -s)"
+  ssh-add "$HOME/.ssh/id_ed25519"
 
-	# Print the public key so you can copy it to GitHub
-	echo "Add this SSH key to GitHub (https://github.com/settings/keys):"
-	cat ~/.ssh/id_ed25519.pub
+  # Correct perms
+  chmod 600 "$HOME/.ssh/id_ed25519"
+  chmod 644 "$HOME/.ssh/id_ed25519.pub"
+
+  # Show public key
+  echo "Add this SSH key to GitHub (https://github.com/settings/keys):"
+  cat "$HOME/.ssh/id_ed25519.pub"
 }
 
-setssh()
+install_vagrant() {
+  # Keyring
+  sudo install -d -m 0755 /etc/apt/keyrings
+  curl -fsSL https://apt.releases.hashicorp.com/gpg \
+    | sudo gpg --dearmor -o /etc/apt/keyrings/hashicorp.gpg
+  sudo chmod 0644 /etc/apt/keyrings/hashicorp.gpg
 
-install_vagrant()  {
+  # Repo (auto-detect codename, e.g. jammy for 22.04)
+  CODENAME="$(. /etc/os-release && echo "$UBUNTU_CODENAME")"
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/hashicorp.gpg] https://apt.releases.hashicorp.com ${CODENAME} main" \
+    | sudo tee /etc/apt/sources.list.d/hashicorp.list >/dev/null
 
-#install vagrant:
-#wget -qO- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-#echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(grep -oP '(?<=UBUNTU_CODENAME=).*' /etc/os-release || lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-#sudo apt update && sudo apt install vagrant
+  # (Optional) fingerprint check
+  gpg --show-keys --with-fingerprint /etc/apt/keyrings/hashicorp.gpg
 
-	# 1) Put the key in the modern keyrings dir (quiet download)
-	sudo install -d -m 0755 /etc/apt/keyrings
-	curl -fsSL https://apt.releases.hashicorp.com/gpg \
-	  | sudo gpg --dearmor -o /etc/apt/keyrings/hashicorp.gpg
-	sudo chmod 0644 /etc/apt/keyrings/hashicorp.gpg
-
-	# 2) Add the repo (Jammy = Ubuntu 22.04)
-	echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/hashicorp.gpg] \
-	https://apt.releases.hashicorp.com jammy main" \
-	| sudo tee /etc/apt/sources.list.d/hashicorp.list >/dev/null
-
-	# 3) (Optional) Verify the key fingerprint BEFORE installing
-	gpg --show-keys --with-fingerprint /etc/apt/keyrings/hashicorp.gpg
-	# Expect: 798A EC65 4E5C 1542 8C8E 42EE AA16 FCBC A621 E701
-
-	# 4) Install
-	sudo apt update
-	sudo apt install vagrant
+  sudo apt-get update -y
+  sudo apt-get install -y vagrant
 }
 
-install_vagrant()
-
-install_kctl {
-	sudo snap install kubectl --classic
-}
-install_kctl()
-
-install_vb()  {
-	#	install virtualbox
-	sudo apt-get install virtualbox
-	#	DKMS = Dynamic Kernel Module Support.
-	#	It’s a system that automatically rebuilds kernel modules (like VirtualBox’s kernel drivers) whenever you update or change your Linux kernel.
-	#	VirtualBox’s kernel drivers (vboxdrv, vboxnetflt, vboxnetadp, etc.) must match your running kernel version.
-	#	If you just installed VirtualBox but didn’t have the kernel headers or dkms in place, its modules can’t compile — hence /dev/vboxdrv missing.
-	sudo apt install --reinstall linux-headers-$(uname -r) virtualbox-dkms dkms
+install_kctl() {
+  # Install kubectl via snap
+  sudo snap install kubectl --classic
 }
 
-install_vm()
+install_vb() {
+  # VirtualBox + DKMS + headers (needed for kernel modules)
+  sudo apt-get update -y
+  sudo apt-get install -y virtualbox virtualbox-dkms dkms "linux-headers-$(uname -r)"
+}
 
-# ssh -fN -R 10022:localhost:2222 root@212.24.101.55
+# ---- Run steps ----
+setssh
+install_vagrant
+install_kctl
+install_vb
+

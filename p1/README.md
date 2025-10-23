@@ -1,3 +1,5 @@
+export KUBECONFIG=./kubeconfig
+kubectl get nodes -o wide
 
 vagrant box list
 vagrant box remove bento/ubuntu-22.04

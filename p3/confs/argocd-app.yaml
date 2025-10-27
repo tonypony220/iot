@@ -5,7 +5,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: hello-web
+  name: will-playground
   namespace: argocd            #  Argo CD Application CRDs live in argocd ns
 spec:
   project: default             # Argo CD “Project” (multitenancy); default is fine

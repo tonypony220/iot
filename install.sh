@@ -52,15 +52,41 @@ install_kctl() {
   sudo snap install kubectl --classic
 }
 
+install_k3d()  {
+  curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+}
+
 install_vb() {
   # VirtualBox + DKMS + headers (needed for kernel modules)
   sudo apt-get update -y
   sudo apt-get install -y virtualbox virtualbox-dkms dkms "linux-headers-$(uname -r)"
 }
 
+install_docker() {
+  sudo apt-get update -y
+  sudo apt-get install -y ca-certificates curl gnupg lsb-release
+  sudo install -m 0755 -d /etc/apt/keyrings
+  curl -fsSL https://download.docker.com/linux/$(. /etc/os-release; echo "$ID")/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  echo \
+    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+    https://download.docker.com/linux/$(. /etc/os-release; echo "$ID") \
+    $(lsb_release -cs) stable" | \
+    sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+  sudo apt-get update -y
+  sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  sudo systemctl enable --now docker
+  docker --version
+  #docker compose version
+}
+
+
+
+
 # ---- Run steps ----
 setssh
 install_vagrant
 install_kctl
 install_vb
+install_docker
+install_k3d
 

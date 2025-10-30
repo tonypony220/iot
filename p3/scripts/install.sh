@@ -1,7 +1,12 @@
-# Install k3d (tiny Kubernetes-in-Docker). Easier & faster than full K8s for a demo.
-curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+#!/usr/bin/env bash
+
+install_k3d() {
+	# Install k3d (tiny Kubernetes-in-Docker). Easier & faster than full K8s for a demo.
+	curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+}
 
 #sudo k3d cluster delete demo
+setup() {
 
 # Create a single-node cluster named "demo".
 # --agents 1 adds one worker (optional but realistic).
@@ -30,20 +35,25 @@ kubectl -n argocd patch deploy argocd-server \
   --type='json' \
   -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--insecure"}]'
 
-kubectl apply -f confs/argo-ingress.yaml
-kubectl apply -f confs/argocd-app.yaml
+kubectl apply -f ../confs/argocd-app.yaml
+kubectl apply -f ../confs/argo-ingress.yaml
 
 # Watch Argo CD pods come up (Ctrl+C when all are Running/Ready).
-kubectl get pods -n argocd -w
+kubectl get pods -n argocd # -w
 
-# Forward the Argo CD web UI to localhost:8081 (no Ingress needed).
-#
-# 		port-forward:  opens a TCP tunnel via the Kubernetes API from your local machine to a Service/Pod inside the cluster
-# 		svc/argocd-server = target Service in argocd namespace
-# 		8081:80 = bind local port 8081 → Service port 80
-# 		--address 0.0.0.0 lets you open it from your LAN; omit if you prefer localhost-only.
-#
-# sudo kubectl -n argocd port-forward svc/argocd-server 8081:80 --address 0.0.0.0
+	# this we don't need since we use ingress now
+	#
+	# Forward the Argo CD web UI to localhost:8081 (no Ingress needed).
+	#
+	# 		port-forward:  opens a TCP tunnel via the Kubernetes API from your local machine to a Service/Pod inside the cluster
+	# 		svc/argocd-server = target Service in argocd namespace
+	# 		8081:80 = bind local port 8081 → Service port 80
+	# 		--address 0.0.0.0 lets you open it from your LAN; omit if you prefer localhost-only.
+	#
+	# sudo kubectl -n argocd port-forward svc/argocd-server 8081:80 --address 0.0.0.0
+}
+
+
 #
 # ------------- SERVICE VS INGRESS -------------
 #
@@ -71,9 +81,16 @@ kubectl get pods -n argocd -w
 # 
 # Argo CD bootstraps an admin password in a Secret.
 # We extract and decode it for first login.
-kubectl -n argocd \
-  get secret argocd-initial-admin-secret \
-  -o jsonpath='{.data.password}' | base64 -d; echo
+pass() {
+	kubectl -n argocd \
+	  get secret argocd-initial-admin-secret \
+	  -o jsonpath='{.data.password}' | base64 -d; echo
+}
 
 
-
+case "$1" in
+    pass) pass ;;
+    install) install_k3d ;;
+    "") setup ;;
+    *) echo "Usage: $0 {install|pass|all}" && exit 1 ;;
+esac

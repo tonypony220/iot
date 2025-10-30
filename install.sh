@@ -52,6 +52,10 @@ install_kctl() {
   sudo snap install kubectl --classic
 }
 
+install_helm() {
+	snap install helm --classic
+}
+
 install_k3d()  {
   curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
 }
@@ -89,4 +93,5 @@ install_kctl
 install_vb
 install_docker
 install_k3d
+install_helm
 

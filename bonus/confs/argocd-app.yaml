@@ -1,0 +1,25 @@
+# argocd-app.yaml
+# This object is *itself* managed by kubectl (imperative for the demo).
+# Argo CD will watch your Git repo at .spec.source.repoURL + .spec.source.path
+# and sync those manifests into the dev namespace of the demo cluster.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: will-playground
+  namespace: argocd            #  Argo CD Application CRDs live in argocd ns
+spec:
+  project: default             # Argo CD “Project” (multitenancy); default is fine
+  source:
+    repoURL: https://github.com/tonypony220/iot.git
+    targetRevision: HEAD       # or a specific branch/commit/semver
+    path: p3/confs/manifests   #  WHERE the manifests live in your repo
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dev             #  WHERE to apply them inside the cluster
+  syncPolicy:
+    automated:
+      prune: true              # delete cluster stuff removed from Git (prevents drift)
+      selfHeal: true           # if someone changes cluster by hand, revert to Git state
+    syncOptions:
+      - CreateNamespace=false  # we already created it; keeps the demo explicit
+

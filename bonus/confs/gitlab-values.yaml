@@ -40,6 +40,13 @@ registry:
 gitlab-runner:
   install: false
 
+  #kas:
+  #  enabled: false
+prometheus:
+  install: false
+grafana:
+  enabled: false
+
 gitlab:
   webservice:
     minReplicas: 1

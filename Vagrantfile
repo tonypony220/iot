@@ -8,14 +8,14 @@ Vagrant.configure("2") do |config|
   # Forwarded ports: host 2222->guest 22 (ssh), host 8080->guest 8080
   config.vm.network "forwarded_port", guest: 22,   host: 2222, id: "ssh", auto_correct: true
   config.vm.network "forwarded_port", guest: 8081, host: 8081, auto_correct: true
-  config.vm.network "forwarded_port", guest: 8080, host: 80, auto_correct: true
+  config.vm.network "forwarded_port", guest: 8080, host: 8080, auto_correct: true
   config.vm.network "forwarded_port", guest: 6445, host: 6445, auto_correct: true
 
   # Resources (low by default)
   config.vm.provider "virtualbox" do |vb|
     vb.gui = false
     vb.cpus = 6
-    vb.memory = 4096
+    vb.memory = 12288 # gitlab is fat 
     # Turn on nested VT-x/AMD-V
     vb.customize ["modifyvm", :id, "--nested-hw-virt", "on"]
     # Optional: expose host CPU profile (helps guests see modern flags)

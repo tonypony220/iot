@@ -53,7 +53,7 @@ install_kctl() {
 }
 
 install_helm() {
-	snap install helm --classic
+	sudo snap install helm --classic
 }
 
 install_k3d()  {

@@ -10,9 +10,9 @@ metadata:
 spec:
   project: default             # Argo CD “Project” (multitenancy); default is fine
   source:
-    repoURL: https://github.com/tonypony220/iot.git
+    repoURL: http://gitlab.127.0.0.1.nip.io:8080/root/iot.git
     targetRevision: HEAD       # or a specific branch/commit/semver
-    path: p3/confs/manifests   #  WHERE the manifests live in your repo
+    path: bonus/confs/manifests   #  WHERE the manifests live in your repo
   destination:
     server: https://kubernetes.default.svc
     namespace: dev             #  WHERE to apply them inside the cluster

@@ -22,6 +22,8 @@ Vagrant.configure("2") do |config|
     vb.customize ["modifyvm", :id, "--cpu-profile", "host"]
   end
 
+  config.vm.disk :disk, size: "60GB", name: "docker-data"
+
   # Provision: run your install script on first boot
   # Put your script next to the Vagrantfile as install.sh
   if File.exist?(SSH_PUB_KEY)

@@ -26,6 +26,50 @@ USER="root"
 #	git push -u origin HEAD
 #}
 
+secret ()  {
+	#!/usr/bin/env bash
+	set -euo pipefail
+
+	# Tunables (override via env if needed)
+	GITLAB_NS="${GITLAB_NS:-gitlab}"
+	ARGO_NS="${ARGO_NS:-argocd}"
+	SECRET_NAME="${SECRET_NAME:-repo-gitlab-iot-http}"
+	REPO_URL="${REPO_URL:-http://gitlab-webservice-default.gitlab.svc.cluster.local:8181/root/iot.git}"
+	USERNAME="${USERNAME:-root}"   # or set to your deploy token username
+
+	# Get GitLab root password from the installed chart's secret
+	PASS="$(kubectl -n "${GITLAB_NS}" get secret gitlab-gitlab-initial-root-password \
+	  -o jsonpath='{.data.password}' | base64 -d)"
+
+	cat > /tmp/${SECRET_NAME}.yaml <<YAML
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ${SECRET_NAME}
+  namespace: ${ARGO_NS}
+  labels:
+    argocd.argoproj.io/secret-type: repository
+type: Opaque
+stringData:
+  url: ${REPO_URL}
+  username: ${USERNAME}
+  password: ${PASS}
+YAML
+
+	kubectl apply -f /tmp/${SECRET_NAME}.yaml
+
+	# Build + apply the Argo CD repository Secret (HTTP basic auth)
+	#kubectl -n "${ARGO_NS}" create secret generic "${SECRET_NAME}" \
+	#  --type=Opaque \
+	#  --from-literal=url="${REPO_URL}" \
+	#  --from-literal=username="${USERNAME}" \
+	#  --from-literal=password="${PASS}" \
+	#  --labels="argocd.argoproj.io/secret-type=repository" \
+	#  --dry-run=client -o yaml | kubectl apply -f -
+
+	echo "? Argo CD repo secret '${SECRET_NAME}' applied in namespace '${ARGO_NS}'."
+}
+
 push()  {
 	# Grab the initial root password from the Secret
 	PASS="$(kubectl -n "${NAMESPACE}" get secret gitlab-gitlab-initial-root-password \
@@ -104,6 +148,7 @@ setup() {
 	  -f ../confs/gitlab-values.yaml
 
 	wait
+	secret
 	push
 	# add wait ready 
 	#
@@ -158,9 +203,15 @@ pass() {
 	  -o jsonpath='{.data.password}' | base64 -d; echo
 }
 
+pass_git()  {
+	kubectl -n gitlab get secret gitlab-gitlab-initial-root-password -o jsonpath='{.data.password}' | base64 -d; echo
+}
+
 case "$1" in
     pass) pass ;;
+    pass_git) pass_git ;;
     push) push ;;
+    secret) secret ;;
     install) install_k3d ;;
     "") setup ;;
     *) echo "Usage: $0 {install|pass|all}" && exit 1 ;;

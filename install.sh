@@ -4,6 +4,8 @@ set -e
 set -u
 set -o pipefail
 
+export DEBIAN_FRONTEND=noninteractive
+
 # Logging function
 log() {
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*"

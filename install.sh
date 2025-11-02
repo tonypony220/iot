@@ -1,75 +1,132 @@
-sudo apt-get update
-sudo apt-get install net-tools
+#!/bin/bash
 
-setssh() {
-	# Install basic tools
-	apt-get update && apt-get install -y git openssh-client
+set -e
+set -u
+set -o pipefail
 
-	# Generate SSH key (skip if already exists)
-	if [ ! -f "$HOME/.ssh/id_ed25519" ]; then
-		ssh-keygen -t ed25519 -C "tony8pony@gmail.com" -f ~/.ssh/id_ed25519 -N ""
-	fi
-
-	# Start ssh-agent
-	eval "$(ssh-agent -s)"
-	ssh-add ~/.ssh/id_ed25519
-
-	# Ensure proper permissions
-	chmod 700 ~/.ssh
-	chmod 600 ~/.ssh/id_ed25519
-	chmod 644 ~/.ssh/id_ed25519.pub
-
-	# Print the public key so you can copy it to GitHub
-	echo "Add this SSH key to GitHub (https://github.com/settings/keys):"
-	cat ~/.ssh/id_ed25519.pub
+# Logging function
+log() {
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*"
 }
 
-setssh()
+log "Starting host VM setup on $(hostname)..."
 
-install_vagrant()  {
+# Function: Install base dependencies
+install_base_deps() {
+    log "Installing base dependencies (make, curl, net-tools)..."
 
-#install vagrant:
-#wget -qO- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-#echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(grep -oP '(?<=UBUNTU_CODENAME=).*' /etc/os-release || lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-#sudo apt update && sudo apt install vagrant
+    if command -v make >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
+        log "Base dependencies already installed, skipping"
+        return 0
+    fi
 
-	# 1) Put the key in the modern keyrings dir (quiet download)
-	sudo install -d -m 0755 /etc/apt/keyrings
-	curl -fsSL https://apt.releases.hashicorp.com/gpg \
-	  | sudo gpg --dearmor -o /etc/apt/keyrings/hashicorp.gpg
-	sudo chmod 0644 /etc/apt/keyrings/hashicorp.gpg
+    sudo apt-get update
+    sudo apt-get install -y make curl net-tools
 
-	# 2) Add the repo (Jammy = Ubuntu 22.04)
-	echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/hashicorp.gpg] \
-	https://apt.releases.hashicorp.com jammy main" \
-	| sudo tee /etc/apt/sources.list.d/hashicorp.list >/dev/null
-
-	# 3) (Optional) Verify the key fingerprint BEFORE installing
-	gpg --show-keys --with-fingerprint /etc/apt/keyrings/hashicorp.gpg
-	# Expect: 798A EC65 4E5C 1542 8C8E 42EE AA16 FCBC A621 E701
-
-	# 4) Install
-	sudo apt update
-	sudo apt install vagrant
+    log "Base dependencies installed successfully"
 }
 
-install_vagrant()
+# Function: Setup SSH key
+setup_ssh() {
+    log "Setting up SSH key..."
 
-install_kctl {
-	sudo snap install kubectl --classic
-}
-install_kctl()
-
-install_vb()  {
-	#	install virtualbox
-	sudo apt-get install virtualbox
-	#	DKMS = Dynamic Kernel Module Support.
-	#	It’s a system that automatically rebuilds kernel modules (like VirtualBox’s kernel drivers) whenever you update or change your Linux kernel.
-	#	VirtualBox’s kernel drivers (vboxdrv, vboxnetflt, vboxnetadp, etc.) must match your running kernel version.
-	#	If you just installed VirtualBox but didn’t have the kernel headers or dkms in place, its modules can’t compile — hence /dev/vboxdrv missing.
-	sudo apt install --reinstall linux-headers-$(uname -r) virtualbox-dkms dkms
+    # Install openssh-client if not present
+    if ! command -v git >/dev/null 2>&1; then
+        log "Installing openssh-client..."
+        sudo apt-get update
+        sudo apt-get install -y openssh-client
+    else
+        log "openssh-client already installed"
+    fi
 }
 
-install_vm()
+# Function: Install Vagrant
+install_vagrant() {
+    log "Installing Vagrant..."
 
-# ssh -fN -R 10022:localhost:2222 root@212.24.101.55
+    if command -v vagrant >/dev/null 2>&1; then
+        log "Vagrant already installed ($(vagrant --version)), skipping"
+        return 0
+    fi
+
+    # Install keyring directory
+    sudo install -d -m 0755 /etc/apt/keyrings
+
+    # Add HashiCorp GPG key
+    log "Adding HashiCorp GPG key..."
+    curl -fsSL https://apt.releases.hashicorp.com/gpg \
+        | sudo gpg --dearmor -o /etc/apt/keyrings/hashicorp.gpg
+    sudo chmod 0644 /etc/apt/keyrings/hashicorp.gpg
+
+    # Add HashiCorp repository
+    log "Adding HashiCorp repository..."
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/hashicorp.gpg] \
+https://apt.releases.hashicorp.com jammy main" \
+        | sudo tee /etc/apt/sources.list.d/hashicorp.list >/dev/null
+
+    # Install Vagrant
+    log "Installing Vagrant package..."
+    sudo apt-get update
+    sudo apt-get install -y vagrant
+
+    log "Vagrant installed successfully: $(vagrant --version)"
+}
+
+# Function: Install kubectl
+install_kubectl() {
+    log "Installing kubectl..."
+
+    if command -v kubectl >/dev/null 2>&1; then
+        log "kubectl already installed ($(kubectl version --client --short 2>/dev/null || echo 'version unknown')), skipping"
+        return 0
+    fi
+
+    log "Installing kubectl via snap..."
+    sudo snap install kubectl --classic
+
+    log "kubectl installed successfully"
+}
+
+# Function: Install VirtualBox
+install_virtualbox() {
+    log "Installing VirtualBox..."
+
+    if command -v VBoxManage >/dev/null 2>&1; then
+        log "VirtualBox already installed ($(VBoxManage --version)), skipping"
+        return 0
+    fi
+
+    log "Installing VirtualBox and kernel modules..."
+    sudo apt-get update
+    sudo apt-get install -y virtualbox
+
+    # Install DKMS and kernel headers for VirtualBox kernel modules
+    # DKMS = Dynamic Kernel Module Support
+    # Automatically rebuilds kernel modules when kernel is updated
+    log "Installing DKMS and kernel headers..."
+    sudo apt-get install -y linux-headers-$(uname -r) virtualbox-dkms dkms
+
+    log "VirtualBox installed successfully: $(VBoxManage --version)"
+}
+
+# Main execution
+main() {
+    log "=== Starting installation process ==="
+
+    install_base_deps
+    setup_ssh
+    install_vagrant
+    install_kubectl
+    install_virtualbox
+
+    log "=== Installation complete ==="
+    log "System is ready for running nested VMs with Vagrant + VirtualBox"
+    log ""
+    log "Next steps:"
+    log "  1. Add your SSH key to GitHub if needed"
+    log "  2. Clone your project repositories"
+    log "  3. Navigate to project directory and run 'make up'"
+}
+
+# Run main function
+main

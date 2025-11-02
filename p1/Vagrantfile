@@ -1,85 +1,55 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-LOGIN1   = ENV.fetch("TEAM_LOGIN1", "mehtel")
-LOGIN2   = ENV.fetch("TEAM_LOGIN2", "mehtel2")
-BOX_NAME = "bento/ubuntu-22.04"
-
-# Run only if explicitly requested
-RUN_SERVER = ENV.fetch("RUN_SERVER", "1").to_i != 0
-RUN_AGENT  = ENV.fetch("RUN_AGENT", "1").to_i != 0
-
-SSH_PUB_KEY = ENV.fetch("SSH_PUB_KEY", File.expand_path("~/.ssh/id_ed25519.pub"))
-SERVER_IP   = "192.168.56.110"
-AGENT_IP    = "192.168.56.111"
-
-unless File.exist?(SSH_PUB_KEY)
-  abort <<~MSG
-    ERROR: SSH public key not found at #{SSH_PUB_KEY}.
-    - Create one:   ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -N ""
-    - Or export:    export SSH_PUB_KEY=/path/to/yourkey.pub
-  MSG
-end
+# Read configuration from environment variables
+LOGIN = ENV['LOGIN']
+BOX_IMAGE = ENV['BOX_IMAGE']
+SERVER_IP = ENV['SERVER_IP'] || '192.168.56.110'
+WORKER_IP = ENV['WORKER_IP'] || '192.168.56.111'
+VM_MEMORY = ENV['VM_MEMORY'] || '1024'
+VM_CPUS = ENV['VM_CPUS'] || '1'
+SHARED_TOKEN_PATH = ENV['SHARED_TOKEN_PATH'] || '/vagrant/token'
 
 Vagrant.configure("2") do |config|
-  config.ssh.insert_key = true
+  # Common configuration for all VMs
+  config.vm.box = BOX_IMAGE
 
-  config.vm.provider "virtualbox" do |vb|
-    vb.cpus   = 1
-    vb.memory = 1024
-  end
+    server.vm.provider "virtualbox" do |vb|
+        vb.memory = VM_MEMORY
+        vb.cpus = VM_CPUS
+    end
 
-  config.vm.provider "parallels" do |prl|
-    prl.cpus   = 1
-    prl.memory = 1024
-  end
+    config.vm.provider "parallels" do |prl|
+        prl.cpus   = VM_CPUS
+        prl.memory = VM_MEMORY
+    end
 
-  # -------- SERVER --------
-  config.vm.define LOGIN1 do |srv|
-    srv.vm.hostname = "#{LOGIN1}S"
-    srv.vm.box      = BOX_NAME
-    srv.vm.network "private_network", ip: SERVER_IP
+  # Server VM
+  config.vm.define "#{LOGIN}S" do |server|
+    server.vm.hostname = "#{LOGIN}S"
+    server.vm.network "private_network", ip: SERVER_IP
 
-    # Drop your host pubkey on the guest; scripts will append safely.
-    srv.vm.provision "file",
-      source: SSH_PUB_KEY,
-      destination: "/tmp/host_id.pub"
-
-    srv.vm.provision "shell",
-      path: "provision/common.sh",
-      args: ["/tmp/host_id.pub"]
-
-    if RUN_SERVER
-      srv.vm.provision "shell",
-        path: "provision/server.sh",
-        args: [SERVER_IP]
-    else
-      srv.vm.provision "shell",
-        inline: "echo 'Skipping server.sh (set RUN_SERVER=1 to enable)'"
+    server.vm.provision "shell" do |s|
+      s.path = "scripts/server.sh"
+      s.env = {
+        "SERVER_IP" => SERVER_IP,
+        "SHARED_TOKEN_PATH" => SHARED_TOKEN_PATH
+      }
     end
   end
 
-  # -------- AGENT --------
-  config.vm.define LOGIN2 do |agt|
-    agt.vm.hostname = "#{LOGIN2}SW"
-    agt.vm.box      = BOX_NAME
-    agt.vm.network "private_network", ip: AGENT_IP
+  # Worker VM
+  config.vm.define "#{LOGIN}SW" do |worker|
+    worker.vm.hostname = "#{LOGIN}SW"
+    worker.vm.network "private_network", ip: WORKER_IP
 
-    agt.vm.provision "file",
-      source: SSH_PUB_KEY,
-      destination: "/tmp/host_id.pub"
-
-    agt.vm.provision "shell",
-      path: "provision/common.sh",
-      args: ["/tmp/host_id.pub"]
-
-    if RUN_AGENT
-     agt.vm.provision "shell",
-       path: "provision/agent.sh",
-       args: [SERVER_IP, AGENT_IP]
-    else
-      agt.vm.provision "shell",
-        inline: "echo 'Skipping agent.sh (set RUN_AGENT=1 to enable)'"
+    worker.vm.provision "shell" do |s|
+      s.path = "scripts/agent.sh"
+      s.env = {
+        "SERVER_IP" => SERVER_IP,
+        "WORKER_IP" => WORKER_IP,
+        "SHARED_TOKEN_PATH" => SHARED_TOKEN_PATH
+      }
     end
   end
 end

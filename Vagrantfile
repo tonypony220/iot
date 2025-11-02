@@ -33,7 +33,7 @@ Vagrant.configure("2") do |config|
     prl.memory = VM_MEMORY
   end
 
-  worker.vm.provision "shell" do |s|
+  config.vm.provision "shell" do |s|
       s.path = "install.sh"
       s.env = {}
   end

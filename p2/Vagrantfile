@@ -27,6 +27,8 @@ Vagrant.configure("2") do |config|
     server.vm.hostname = "#{LOGIN}S"
     server.vm.network "private_network", ip: SERVER_IP
 
+    server.vm.synced_folder ".", "/vagrant"
+
     # Forwarded ports
     server.vm.network "forwarded_port", guest: 80, host: 8080
 

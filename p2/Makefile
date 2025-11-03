@@ -20,6 +20,8 @@ export VM_MEMORY
 export VM_CPUS
 export PROVIDER
 
+all: check-env up
+
 check-env:
 	@if [ -z "$(LOGIN)" ]; then \
 		echo "ERROR: LOGIN is not set"; \

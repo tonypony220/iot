@@ -126,7 +126,9 @@ install_virtualbox() {
     # DKMS = Dynamic Kernel Module Support
     # Automatically rebuilds kernel modules when kernel is updated
     log "Installing DKMS and kernel headers..."
-    sudo apt-get install -y linux-headers-$(uname -r) virtualbox-dkms dkms
+    sudo apt-get install -y linux-headers-$(uname -r) linux-headers-generic build-essential dkms virtualbox-dkms
+    sudo dpkg-reconfigure virtualbox-dkms
+    sudo dpkg-reconfigure virtualbox
 
     log "VirtualBox installed successfully: $(VBoxManage --version)"
 }

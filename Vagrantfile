@@ -19,6 +19,8 @@ Vagrant.configure("2") do |config|
   config.vm.network "forwarded_port", guest: 8080, host: 8080, auto_correct: true
   config.vm.network "forwarded_port", guest: 6445, host: 6445, auto_correct: true
 
+  config.vm.synced_folder ".", "/vagrant"
+
   # VirtualBox provider configuration
   config.vm.provider "virtualbox" do |vb|
     vb.gui = false

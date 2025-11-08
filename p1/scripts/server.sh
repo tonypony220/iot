@@ -57,5 +57,3 @@ sudo cp "${TOKEN_FILE}" "${SHARED_TOKEN_PATH}"
 sudo chmod 644 "${SHARED_TOKEN_PATH}"
 
 log "Server setup complete!"
-log "Node status:"
-sudo kubectl get nodes -o wide

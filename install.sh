@@ -1,55 +1,88 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/bash
 
-setssh() {
-  # Install basic tools
-  sudo apt-get update -y
-  sudo apt-get install -y git openssh-client curl ca-certificates gnupg
+set -e
+set -u
+set -o pipefail
 
-  # Ensure ~/.ssh exists & perms
-  mkdir -p "$HOME/.ssh"
-  chmod 700 "$HOME/.ssh"
+export DEBIAN_FRONTEND=noninteractive
 
-  # Generate SSH key (skip if already exists)
-  if [ ! -f "$HOME/.ssh/id_ed25519" ]; then
-    ssh-keygen -t ed25519 -C "tony8pony@gmail.com" -f "$HOME/.ssh/id_ed25519" -N ""
-  fi
+# Logging function
+log() {
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*"
+}
 
-  # Start ssh-agent & add key
-  eval "$(ssh-agent -s)"
-  ssh-add "$HOME/.ssh/id_ed25519"
+log "Starting host VM setup on $(hostname)..."
 
-  # Correct perms
-  chmod 600 "$HOME/.ssh/id_ed25519"
-  chmod 644 "$HOME/.ssh/id_ed25519.pub"
+install_base_deps() {
+    log "Installing base dependencies (make, curl, net-tools)..."
 
-  # Show public key
-  echo "Add this SSH key to GitHub (https://github.com/settings/keys):"
-  cat "$HOME/.ssh/id_ed25519.pub"
+    if command -v make >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
+        log "Base dependencies already installed, skipping"
+        return 0
+    fi
+
+    sudo apt-get update
+    sudo apt-get install -y make curl net-tools
+
+    log "Base dependencies installed successfully"
+}
+
+setup_ssh() {
+    log "Setting up SSH key..."
+
+    # Install openssh-client if not present
+    if ! command -v git >/dev/null 2>&1; then
+        log "Installing openssh-client..."
+        sudo apt-get update
+        sudo apt-get install -y openssh-client
+    else
+        log "openssh-client already installed"
+    fi
 }
 
 install_vagrant() {
-  # Keyring
-  sudo install -d -m 0755 /etc/apt/keyrings
-  curl -fsSL https://apt.releases.hashicorp.com/gpg \
-    | sudo gpg --dearmor -o /etc/apt/keyrings/hashicorp.gpg
-  sudo chmod 0644 /etc/apt/keyrings/hashicorp.gpg
+    log "Installing Vagrant..."
 
-  # Repo (auto-detect codename, e.g. jammy for 22.04)
-  CODENAME="$(. /etc/os-release && echo "$UBUNTU_CODENAME")"
-  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/hashicorp.gpg] https://apt.releases.hashicorp.com ${CODENAME} main" \
-    | sudo tee /etc/apt/sources.list.d/hashicorp.list >/dev/null
+    if command -v vagrant >/dev/null 2>&1; then
+        log "Vagrant already installed ($(vagrant --version)), skipping"
+        return 0
+    fi
 
-  # (Optional) fingerprint check
-  gpg --show-keys --with-fingerprint /etc/apt/keyrings/hashicorp.gpg
+    # Install keyring directory
+    sudo install -d -m 0755 /etc/apt/keyrings
 
-  sudo apt-get update -y
-  sudo apt-get install -y vagrant
+    # Add HashiCorp GPG key
+    log "Adding HashiCorp GPG key..."
+    curl -fsSL https://apt.releases.hashicorp.com/gpg \
+        | sudo gpg --dearmor -o /etc/apt/keyrings/hashicorp.gpg
+    sudo chmod 0644 /etc/apt/keyrings/hashicorp.gpg
+
+    # Add HashiCorp repository
+    log "Adding HashiCorp repository..."
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/hashicorp.gpg] \
+https://apt.releases.hashicorp.com jammy main" \
+        | sudo tee /etc/apt/sources.list.d/hashicorp.list >/dev/null
+
+    # Install Vagrant
+    log "Installing Vagrant package..."
+    sudo apt-get update
+    sudo apt-get install -y vagrant
+
+    log "Vagrant installed successfully: $(vagrant --version)"
 }
 
-install_kctl() {
-  # Install kubectl via snap
-  sudo snap install kubectl --classic
+install_kubectl() {
+    log "Installing kubectl..."
+
+    if command -v kubectl >/dev/null 2>&1; then
+        log "kubectl already installed ($(kubectl version --client --short 2>/dev/null || echo 'version unknown')), skipping"
+        return 0
+    fi
+
+    log "Installing kubectl via snap..."
+    sudo snap install kubectl --classic
+
+    log "kubectl installed successfully"
 }
 
 install_helm() {
@@ -58,12 +91,6 @@ install_helm() {
 
 install_k3d()  {
   curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
-}
-
-install_vb() {
-  # VirtualBox + DKMS + headers (needed for kernel modules)
-  sudo apt-get update -y
-  sudo apt-get install -y virtualbox virtualbox-dkms dkms "linux-headers-$(uname -r)"
 }
 
 install_docker() {
@@ -83,15 +110,47 @@ install_docker() {
   #docker compose version
 }
 
+install_virtualbox() {
+    log "Installing VirtualBox..."
 
+    if command -v VBoxManage >/dev/null 2>&1; then
+        log "VirtualBox already installed ($(VBoxManage --version)), skipping"
+        return 0
+    fi
 
+    log "Installing VirtualBox and kernel modules..."
+    sudo apt-get update
+    sudo apt-get install -y virtualbox
 
-# ---- Run steps ----
-setssh
-install_vagrant
-install_kctl
-install_vb
-install_docker
-install_k3d
-install_helm
+    # Install DKMS and kernel headers for VirtualBox kernel modules
+    # DKMS = Dynamic Kernel Module Support
+    # Automatically rebuilds kernel modules when kernel is updated
+    log "Installing DKMS and kernel headers..."
+    sudo apt-get install -y linux-headers-$(uname -r) virtualbox-dkms dkms
 
+    log "VirtualBox installed successfully: $(VBoxManage --version)"
+}
+
+main() {
+    log "=== Starting installation process ==="
+
+    install_base_deps
+    setup_ssh
+    install_vagrant
+    install_virtualbox
+    install_kubectl
+    install_helm
+    install_k3d
+    install_docker
+
+    log "=== Installation complete ==="
+    log "System is ready for running nested VMs with Vagrant + VirtualBox"
+    log ""
+    log "Next steps:"
+    log "  1. Add your SSH key to GitHub if needed"
+    log "  2. Clone your project repositories"
+    log "  3. Navigate to project directory and run 'make up'"
+}
+
+# Run main function
+main

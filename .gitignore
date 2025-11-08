@@ -1,0 +1,20 @@
+# Vagrant
+.vagrant/
+*.box
+
+# K3s token
+token
+
+# Kubernetes config
+.kube/
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.swp
+*~
+
+# OS specific
+.DS_Store

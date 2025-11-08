@@ -5,13 +5,11 @@
 LOGIN = ENV['LOGIN']
 BOX_IMAGE = ENV['BOX_IMAGE']
 SERVER_IP = ENV['SERVER_IP'] || '192.168.56.110'
-WORKER_IP = ENV['WORKER_IP'] || '192.168.56.111'
 VM_MEMORY = ENV['VM_MEMORY'] || '1024'
 VM_CPUS = ENV['VM_CPUS'] || '1'
-SHARED_TOKEN_PATH = ENV['SHARED_TOKEN_PATH'] || '/vagrant/token'
 
 Vagrant.configure("2") do |config|
-  # Common configuration for all VMs
+  # Common configuration
   config.vm.box = BOX_IMAGE
 
   config.vm.provider "virtualbox" do |vb|
@@ -29,26 +27,14 @@ Vagrant.configure("2") do |config|
     server.vm.hostname = "#{LOGIN}S"
     server.vm.network "private_network", ip: SERVER_IP
 
+    # Forwarded ports
+    server.vm.network "forwarded_port", guest: 80, host: 8080
+
+    # Provision K3s server and deploy applications
     server.vm.provision "shell" do |s|
-      s.path = "scripts/server.sh"
+      s.path = "scripts/setup.sh"
       s.env = {
-        "SERVER_IP" => SERVER_IP,
-        "SHARED_TOKEN_PATH" => SHARED_TOKEN_PATH
-      }
-    end
-  end
-
-  # Worker VM
-  config.vm.define "#{LOGIN}SW" do |worker|
-    worker.vm.hostname = "#{LOGIN}SW"
-    worker.vm.network "private_network", ip: WORKER_IP
-
-    worker.vm.provision "shell" do |s|
-      s.path = "scripts/agent.sh"
-      s.env = {
-        "SERVER_IP" => SERVER_IP,
-        "WORKER_IP" => WORKER_IP,
-        "SHARED_TOKEN_PATH" => SHARED_TOKEN_PATH
+        "SERVER_IP" => SERVER_IP
       }
     end
   end

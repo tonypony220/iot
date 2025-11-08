@@ -31,12 +31,13 @@ kubectl create namespace dev
 # Install the official Argo CD bundle (CRDs + controllers + API/UI server).
 # We install it *into* the argocd namespace we just created.
 kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+# Disables TLS on the ArgoCD server to be Accessible via HTTP instead of HTTPS
 kubectl -n argocd patch deploy argocd-server \
   --type='json' \
   -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--insecure"}]'
 
-kubectl apply -f ../confs/argocd-app.yaml
-kubectl apply -f ../confs/argo-ingress.yaml
+kubectl apply -f confs/argocd-app.yaml
+kubectl apply -f confs/argo-ingress.yaml
 
 # Watch Argo CD pods come up (Ctrl+C when all are Running/Ready).
 kubectl get pods -n argocd # -w
@@ -50,6 +51,7 @@ kubectl get pods -n argocd # -w
 	# 		8081:80 = bind local port 8081 â†’ Service port 80
 	# 		--address 0.0.0.0 lets you open it from your LAN; omit if you prefer localhost-only.
 	#
+	# YOU MUST EXECUTE IT TO FORWARD PORT TO YOUR HOST !!!
 	# sudo kubectl -n argocd port-forward svc/argocd-server 8081:80 --address 0.0.0.0
 }
 
@@ -61,7 +63,7 @@ kubectl get pods -n argocd # -w
 # 
 # 	type: ClusterIP (default): internal only. Use port-forward to reach it from your host.
 # 	
-# 	type: NodePort: opens a high port (30000Ð32767) on each node.
+# 	type: NodePort: opens a high port (30000ï¿½32767) on each node.
 # 	
 # 	type: LoadBalancer: asks an external LB to expose it. In k3d, the k3d-proxy container emulates this when you used -p "...@loadbalancer".
 # 
@@ -92,5 +94,5 @@ case "$1" in
     pass) pass ;;
     install) install_k3d ;;
     "") setup ;;
-    *) echo "Usage: $0 {install|pass|all}" && exit 1 ;;
+    *) echo "Usage: $0 {install|pass}" && exit 1 ;;
 esac

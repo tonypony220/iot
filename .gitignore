@@ -18,3 +18,7 @@ token
 
 # OS specific
 .DS_Store
+
+# IDE specific
+.idea/
+.vscode/

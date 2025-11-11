@@ -37,6 +37,14 @@ up: check-env
 	vagrant up
 	@echo "VM started successfully!"
 	@echo "Use 'make ssh' to connect to the VM"
+	
+up-raw: check-env
+	@echo "Starting host VM..."
+	@echo "Hostname: $(VM_HOSTNAME)"
+	@echo "Resources: $(VM_CPUS) CPUs, $(VM_MEMORY) MB RAM"
+	vagrant up --no-provision
+	@echo "VM started successfully!"
+	@echo "Use 'make ssh' to connect to the VM"
 
 down:
 	vagrant halt

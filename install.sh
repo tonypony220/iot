@@ -13,6 +13,14 @@ log() {
 
 log "Starting host VM setup on $(hostname)..."
 
+resize_disk() {
+    sudo apt install -y cloud-guest-utils
+    sudo growpart /dev/sda 3
+    sudo pvresize /dev/sda3
+    sudo lvextend -l +100%FREE /dev/ubuntu-vg/ubuntu-lv
+    sudo resize2fs /dev/ubuntu-vg/ubuntu-lv
+}
+
 install_base_deps() {
     log "Installing base dependencies (make, curl, net-tools)..."
 
@@ -137,6 +145,7 @@ main() {
     log "=== Starting installation process ==="
 
     install_base_deps
+    resize_disk
     setup_ssh
     install_vagrant
     install_virtualbox

@@ -4,7 +4,7 @@ BOX_IMAGE ?= bento/ubuntu-22.04
 VM_HOSTNAME ?= evaluationVM
 
 # VM Resources
-VM_MEMORY ?= 4096
+VM_MEMORY ?= 12288
 VM_CPUS ?= 6
 
 # Provider

@@ -14,12 +14,48 @@ log() {
 log "Starting host VM setup on $(hostname)..."
 
 resize_disk() {
-    sudo apt install -y cloud-guest-utils
-    sudo growpart /dev/sda 3
-    sudo pvresize /dev/sda3
-    sudo lvextend -l +100%FREE /dev/ubuntu-vg/ubuntu-lv
-    sudo resize2fs /dev/ubuntu-vg/ubuntu-lv
+
+  set -e
+  echo "[1/5] Layout:"; lsblk
+
+  # Try to grow the last partition if it's a simple /dev/sda3 case; ignore NOCHANGE
+  if [ -b /dev/sda3 ]; then
+    echo "[2/5] growpart (may say NOCHANGE)..."
+    sudo apt-get update -y >/dev/null
+    sudo apt-get install -y cloud-guest-utils >/dev/null
+    sudo growpart /dev/sda 3 || true
+  else
+    echo "[2/5] Skipping growpart (no /dev/sda3)."
+  fi
+
+  # Identify root LV and filesystem
+  ROOT_SRC=$(findmnt -no SOURCE /)          # e.g. /dev/mapper/ubuntu--vg-ubuntu--lv
+  FSTYPE=$(findmnt -no FSTYPE /)            # ext4 or xfs expected
+  VG=$(lvs --noheadings -o vg_name "$ROOT_SRC" 2>/dev/null | awk '{$1=$1};1')
+  LV=$(lvs --noheadings -o lv_name "$ROOT_SRC" 2>/dev/null | awk '{$1=$1};1')
+
+  echo "[3/5] pvresize..."
+  # Common Ubuntu Vagrant layout uses /dev/sda3 as the PV
+  if [ -b /dev/sda3 ]; then
+    sudo pvresize /dev/sda3 || true
+  fi
+
+  echo "[4/5] lvextend to use all free space..."
+  sudo lvextend -l +100%FREE "/dev/${VG}/${LV}"
+
+  echo "[5/5] Grow filesystem (${FSTYPE})..."
+  if [ "$FSTYPE" = "ext4" ]; then
+    sudo resize2fs "/dev/${VG}/${LV}"
+  elif [ "$FSTYPE" = "xfs" ]; then
+    sudo xfs_growfs /
+  else
+    echo "Unknown fs $FSTYPE — not resizing"; exit 1
+  fi
+
+  echo "✅ Done:"
+  df -h /
 }
+
 
 install_base_deps() {
     log "Installing base dependencies (make, curl, net-tools)..."

@@ -54,6 +54,8 @@ status:
 
 ssh:
 	vagrant ssh
+copy:
+	rsync -avr -e 'ssh -p 2222' . vagrant@localhost:~/iot/
 
 reload:
 	vagrant reload --provision
@@ -64,4 +66,4 @@ clean:
 	@rm -rf $(VIRTUALBOX_HOME)
 	@rm -rf $(VAGRANT_HOME)
 
-.PHONY: all help check-env up down status ssh reload clean
+.PHONY: all help check-env up down status ssh reload clean check-env copy

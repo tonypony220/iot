@@ -132,8 +132,8 @@ setup() {
 	  --type='json' \
 	  -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--insecure"}]'
 
-	kubectl apply -f ../confs/argocd-app.yaml
-	kubectl apply -f ../confs/argo-ingress.yaml
+	kubectl apply -f confs/argocd-app.yaml
+	kubectl apply -f confs/argo-ingress.yaml
 
 	helm repo add gitlab https://charts.gitlab.io
 	helm repo update
@@ -145,7 +145,7 @@ setup() {
 
 	helm upgrade --install gitlab gitlab/gitlab \
 	  --namespace gitlab \
-	  -f ../confs/gitlab-values.yaml
+	  -f confs/gitlab-values.yaml
 
 	wait
 	secret

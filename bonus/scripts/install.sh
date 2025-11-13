@@ -197,19 +197,7 @@ setup() {
 
 }
 
-pass() {
-	kubectl -n argocd \
-	  get secret argocd-initial-admin-secret \
-	  -o jsonpath='{.data.password}' | base64 -d; echo
-}
-
-pass_git()  {
-	kubectl -n gitlab get secret gitlab-gitlab-initial-root-password -o jsonpath='{.data.password}' | base64 -d; echo
-}
-
 case "$1" in
-    pass) pass ;;
-    pass_git) pass_git ;;
     push) push ;;
     secret) secret ;;
     install) install_k3d ;;

@@ -7,6 +7,11 @@ metadata:
     app: will-playground
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: will-playground
@@ -18,8 +23,21 @@ spec:
       containers:
         - name: playground
           image: "wil42/playground:v1"
+          imagePullPolicy: Always
           ports:
             - containerPort: 8888
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8888
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8888
+            initialDelaySeconds: 15
+            periodSeconds: 10
 ---
 apiVersion: v1
 kind: Service

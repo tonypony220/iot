@@ -10,7 +10,7 @@ metadata:
 spec:
   project: default             # Argo CD “Project” (multitenancy); default is fine
   source:
-    repoURL: https://github.com/tonypony220/iot.git
+    repoURL: https://github.com/tonypony220/iot_mehtel.git
     targetRevision: HEAD       # or a specific branch/commit/semver
     path: p3/confs/manifests   #  WHERE the manifests live in your repo
   destination:

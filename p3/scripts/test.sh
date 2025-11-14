@@ -69,7 +69,7 @@ if [ "$ARGOCD_PODS" -gt 0 ]; then
     success "Found $ARGOCD_PODS Argo CD pods"
 
     # Check if all are running
-    NOT_RUNNING=$(kubectl get pods -n argocd --no-headers 2>/dev/null | grep -v "Running" | wc -l)
+    NOT_RUNNING=$(kubectl get pods -n argocd --no-headers 2>/dev/null | grep -v "Running" | wc -l || true)
     if [ "$NOT_RUNNING" -eq 0 ]; then
         success "All Argo CD pods are running"
     else

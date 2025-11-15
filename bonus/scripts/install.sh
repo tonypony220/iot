@@ -18,7 +18,7 @@ k3d cluster create ${CLUSTER_NAME:-demo} \
   --servers 1 --agents 2 \
   --api-port ${API_PORT:-6445} \
   -p "${HTTP_PORT:-8080}:80@loadbalancer" \
-  -p "${ARGO_PORT:-8888}:8888@loadbalancer" \
+  -p "${APP_PORT:-8888}:8888@loadbalancer" \
   -p "${GITLAB_PORT:-8181}:8181@loadbalancer"
 echo "  ✓ K3d cluster created"
 

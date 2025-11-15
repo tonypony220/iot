@@ -26,7 +26,7 @@ k3d cluster create "${CLUSTER_NAME}" \
   --servers 1 --agents 1 \
   --api-port "${API_PORT}" \
   -p "${HTTP_PORT}:80@loadbalancer" \
-  --port "${ARGO_PORT}:${ARGO_PORT}@loadbalancer"
+  --port "${APP_PORT}:${APP_PORT}@loadbalancer"
 
 log "Cluster created successfully"
 
@@ -63,6 +63,6 @@ kubectl get pods -n argocd
 
 log "Setup complete!"
 log ""
-log "Access Argo CD UI at: http://localhost:${ARGO_PORT}"
+log "Access Argo CD UI at: http://127.0.0.1.nip.io:8080"
 log "Username: admin"
-log "Get password with: ./scripts/get-argocd-password.sh"
+log "Password:" $(./scripts/get-argocd-password.sh)

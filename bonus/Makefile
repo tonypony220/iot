@@ -2,14 +2,14 @@
 CLUSTER_NAME ?= demo
 API_PORT ?= 6445
 HTTP_PORT ?= 8080
-ARGO_PORT ?= 8888
+APP_PORT ?= 8888
 GITLAB_PORT ?= 8181
 
 # Export all variables for scripts
 export CLUSTER_NAME
 export API_PORT
 export HTTP_PORT
-export ARGO_PORT
+export APP_PORT
 export GITLAB_PORT
 
 all: check-deps up info
@@ -64,17 +64,17 @@ info:
 	@echo "ACCESS INFORMATION"
 	@echo "════════════════════════════════════════"
 	@echo ""
-	@echo "GitLab:  http://localhost:$(GITLAB_PORT)"
+	@echo "GitLab:  http://gitlab.127.0.0.1.nip.io:${HTTP_PORT}"
 	@echo "  User:  root"
 	@echo -n "  Pass:  "
 	@./scripts/get-gitlab-password.sh 2>/dev/null || echo "Cannot retrieve password"
 	@echo ""
-	@echo "ArgoCD:  http://localhost:$(ARGO_PORT)"
+	@echo "ArgoCD:  http://argocd.127.0.0.1.nip.io:${HTTP_PORT}"
 	@echo "  User:  admin"
 	@echo -n "  Pass:  "
 	@./scripts/get-argocd-password.sh 2>/dev/null || echo "Cannot retrieve password"
 	@echo ""
-	@echo "App:     http://localhost:$(HTTP_PORT)"
+	@echo "App:     http://localhost:$(APP_PORT)"
 	@echo ""
 	@echo "To test v1→v2: Edit bonus/confs/manifests/wii.yaml,"
 	@echo "               commit & push to GitLab, watch ArgoCD sync"

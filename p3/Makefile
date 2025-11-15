@@ -2,14 +2,14 @@
 CLUSTER_NAME ?= demo
 API_PORT ?= 6445
 HTTP_PORT ?= 8080
-ARGO_PORT ?= 8888
+APP_PORT ?= 8888
 
 
 # Export all variables for scripts
 export CLUSTER_NAME
 export API_PORT
 export HTTP_PORT
-export ARGO_PORT
+export APP_PORT
 
 all: up
 
@@ -60,12 +60,10 @@ status:
 argocd-ui:
 	@echo "=== Argo CD Access Information ==="
 	@echo ""
-	@echo "URL: http://localhost:$(ARGO_PORT)"
+	@echo "URL: http://argocd.127.0.0.1.nip.io:${HTTP_PORT}"
 	@echo "Username: admin"
 	@echo -n "Password: "
 	@./scripts/get-argocd-password.sh 2>/dev/null || echo "Cannot retrieve password"
-	@echo ""
-	@echo "Note: Make sure the ingress is working and port $(ARGO_PORT) is exposed"
 
 test:
 	@./scripts/test.sh

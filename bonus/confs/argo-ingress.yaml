@@ -1,13 +1,25 @@
+# ArgoCD Ingress - HTTP Access Configuration
+# This ingress allows external access to ArgoCD UI via HTTP
+#
+# Domain: argocd.127.0.0.1.nip.io
+# - Uses nip.io for automatic DNS resolution (no /etc/hosts needed)
+# - nip.io resolves any subdomain of 127.0.0.1.nip.io to 127.0.0.1
+# - Traefik ingress controller routes requests based on the Host header
+#
+# Access: http://argocd.127.0.0.1.nip.io:8888
+
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: argocd
   namespace: argocd
   annotations:
-    traefik.ingress.kubernetes.io/router.entrypoints: web   # Traefik’s :80
+    # Traefik annotation to use HTTP entrypoint (port 80)
+    traefik.ingress.kubernetes.io/router.entrypoints: web
 spec:
   ingressClassName: traefik
   rules:
+    # Host-based routing using nip.io wildcard DNS
     - host: argocd.127.0.0.1.nip.io
       http:
         paths:
@@ -18,4 +30,3 @@ spec:
                 name: argocd-server
                 port:
                   number: 80
-

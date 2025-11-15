@@ -1,26 +1,64 @@
-# argocd-app.yaml
-# This object is *itself* managed by kubectl (imperative for the demo).
-# Argo CD will watch your Git repo at .spec.source.repoURL + .spec.source.path
-# and sync those manifests into the dev namespace of the demo cluster.
+# ArgoCD Application - GitLab Integration
+# This Application CRD tells ArgoCD to watch the internal GitLab repository
+# and automatically sync manifests to the 'dev' namespace
+#
+# Key Features:
+# - Automated sync with prune and self-heal enabled
+# - Connects to internal GitLab service (no external dependencies)
+# - Deploys to 'dev' namespace in the same cluster
+
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: will-playground
-  namespace: argocd            #  Argo CD Application CRDs live in argocd ns
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
 spec:
-  project: default             # Argo CD “Project” (multitenancy); default is fine
+  # Project for application grouping and RBAC
+  project: default
+
+  # Source: Internal GitLab repository
+  # Note: Using cluster-internal DNS instead of nip.io
+  # ArgoCD runs inside the cluster, so it can use Kubernetes service DNS
+  # Format: <service-name>.<namespace>.svc.cluster.local
+  # This is more reliable than external DNS (nip.io) for internal communication
   source:
-    #repoURL: http://gitlab.127.0.0.1.nip.io:8080/root/iot.git
-    repoURL: http://gitlab-webservice-default.gitlab.svc.cluster.local:8181/root/iot.git
-    targetRevision: HEAD       # or a specific branch/commit/semver
-    path: bonus/confs/manifests   #  WHERE the manifests live in your repo
+    repoURL: http://gitlab-webservice-default.gitlab.svc.cluster.local:8181/root/apending_iot.git
+    targetRevision: HEAD
+    path: bonus/confs/manifests
+
+  # Destination: dev namespace in the same cluster
   destination:
     server: https://kubernetes.default.svc
-    namespace: dev             #  WHERE to apply them inside the cluster
+    namespace: dev
+
+  # Sync Policy: Automated with self-healing
   syncPolicy:
     automated:
-      prune: true              # delete cluster stuff removed from Git (prevents drift)
-      selfHeal: true           # if someone changes cluster by hand, revert to Git state
+      # Prune: Remove resources deleted from Git
+      prune: true
+      # Self-heal: Revert manual changes back to Git state
+      selfHeal: true
+      # Allow empty: Sync even if no resources
+      allowEmpty: false
+
+    # Sync options
     syncOptions:
-      - CreateNamespace=false  # we already created it; keeps the demo explicit
+      # Namespace already created by install script
+      - CreateNamespace=false
+      # Validate resources before applying
+      - Validate=true
+      # Use server-side apply for better conflict resolution
+      - ServerSideApply=false
+      # Prune last to avoid issues with dependencies
+      - PruneLast=true
+
+    # Retry configuration for transient failures
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
 

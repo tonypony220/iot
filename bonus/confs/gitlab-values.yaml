@@ -1,8 +1,25 @@
+# GitLab Community Edition - Optimized for local development
+# This configuration minimizes resource usage and startup time
+
 global:
   edition: ce
   hosts:
+    # Domain: Using nip.io for automatic DNS resolution
+    # nip.io is a free wildcard DNS service that resolves to the embedded IP
+    # Example: gitlab.127.0.0.1.nip.io -> 127.0.0.1
+    #
+    # Why nip.io?
+    # 1. GitLab requires a domain name (won't work with bare IP)
+    # 2. Ingress routing needs hostnames for the Host header
+    # 3. No /etc/hosts editing required
+    # 4. Works automatically without any DNS setup
+    #
+    # Alternative: Use /etc/hosts with custom domain like "gitlab.local"
     domain: 127.0.0.1.nip.io
     https: false
+    gitlab:
+      serviceName: gitlab-webservice-default
+      servicePort: 8181
   ingress:
     class: traefik
     tls:
@@ -11,7 +28,7 @@ global:
   appConfig:
     enableUsagePing: false
     enableSeatLink: false
-    # Explicitly disable object storage per type, so no connection is required.
+    # Disable all object storage features for faster startup
     artifacts:
       enabled: false
     lfs:
@@ -20,15 +37,17 @@ global:
       enabled: false
     packages:
       enabled: false
-    # (Optional) if present in your values, make sure the unified object store is off too:
     object_store:
       enabled: false
 
+  # Disable unused services
   kas:
     enabled: false
-  minio:
-    enabled: false        # <-- moved here
 
+  minio:
+    enabled: false
+
+# Disable unnecessary components
 installCertmanager: false
 
 nginx-ingress:
@@ -40,32 +59,83 @@ registry:
 gitlab-runner:
   install: false
 
-  #kas:
-  #  enabled: false
 prometheus:
   install: false
+
 grafana:
   enabled: false
 
+# Configure GitLab components with minimal replicas and optimized settings
 gitlab:
   webservice:
     minReplicas: 1
     maxReplicas: 1
+    resources:
+      requests:
+        cpu: 200m
+        memory: 1Gi
+      limits:
+        cpu: 1
+        memory: 2Gi
+    # Tune probes for faster readiness
+    livenessProbe:
+      initialDelaySeconds: 20
+      periodSeconds: 10
+    readinessProbe:
+      initialDelaySeconds: 20
+      periodSeconds: 5
+
   sidekiq:
     minReplicas: 1
     maxReplicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
   gitaly:
     minReplicas: 1
     maxReplicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
   toolbox:
-      backups:
+    backups:
+      enabled: false
+      # Disable object storage backups for local development
+      objectStorage:
         enabled: false
-        # Turn off object-storage-backed backups for local dev
-        objectStorage:
-          enabled: false
-          config:
-            secret: gitlab-backup-empty
-            key: config
-        # Also disable the cron so it doesn’t try to run backups automatically
-        cron:
-          enabled: false
+        config:
+          secret: gitlab-backup-empty
+          key: config
+      # Disable automatic backup cron
+      cron:
+        enabled: false
+
+# PostgreSQL optimization
+postgresql:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Redis optimization
+redis:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi

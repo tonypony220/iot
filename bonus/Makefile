@@ -3,32 +3,27 @@ CLUSTER_NAME ?= demo
 API_PORT ?= 6445
 HTTP_PORT ?= 8080
 ARGO_PORT ?= 8888
-
+GITLAB_PORT ?= 8181
 
 # Export all variables for scripts
 export CLUSTER_NAME
 export API_PORT
 export HTTP_PORT
 export ARGO_PORT
+export GITLAB_PORT
 
-all: up
+all: check-deps up info
 
-check-k3d:
-	@command -v k3d >/dev/null 2>&1 || { echo "ERROR: k3d not installed. Run 'make install'"; exit 1; }
-	@command -v kubectl >/dev/null 2>&1 || { echo "ERROR: kubectl not installed. Run 'make install'"; exit 1; }
+check-deps:
+	@echo "[✓] Checking dependencies..."
+	@command -v k3d >/dev/null 2>&1 || { echo "[✗] k3d not installed"; exit 1; }
+	@command -v kubectl >/dev/null 2>&1 || { echo "[✗] kubectl not installed"; exit 1; }
+	@command -v helm >/dev/null 2>&1 || { echo "[✗] helm not installed"; exit 1; }
+	@command -v git >/dev/null 2>&1 || { echo "[✗] git not installed"; exit 1; }
+	@echo "[✓] All dependencies found"
 
-up: check-k3d
-	@echo "Creating K3D cluster '$(CLUSTER_NAME)'..."
-	./scripts/install.sh
-	@echo ""
-	@echo "Cluster created successfully!"
-	@echo "Waiting for Argo CD to be ready..."
-	@sleep 5
-	@kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=argocd-server -n argocd --timeout=300s 2>/dev/null || true
-	@echo ""
-	@echo "Setup complete!"
-	@echo "Run 'make argocd-ui' to get access information"
-	@echo "Run 'make status' to check deployment status"
+up: check-deps
+	@./scripts/install.sh
 
 down:
 	@echo "Stopping K3D cluster..."
@@ -63,36 +58,39 @@ status:
 	@echo "=== Gitlab Applications ==="
 	@kubectl get applications -n gitlab 2>/dev/null || echo "Cannot get Gitlab applications"
 
-argocd-ui:
-	@echo "=== Argo CD Access Information ==="
+info:
 	@echo ""
-	@echo "URL: http://argocd.127.0.0.1.nip.io:$(HTTP_PORT)"
-	@echo "Username: admin"
-	@echo -n "Password: "
-	@./scripts/get-argocd-password.sh 2>/dev/null || echo "Cannot retrieve password"
+	@echo "════════════════════════════════════════"
+	@echo "ACCESS INFORMATION"
+	@echo "════════════════════════════════════════"
 	@echo ""
-	@echo "Note: Make sure the ingress is working and port $(HTTP_PORT) is exposed"
-
-gitlab:
-	@echo "=== Gitlab Access Information ==="
-	@echo ""
-	@echo "URL: http://gitlab.127.0.0.1.nip.io$(HTTP_PORT)"
-	@echo "Username: root"
-	@echo -n "Password: "
+	@echo "GitLab:  http://localhost:$(GITLAB_PORT)"
+	@echo "  User:  root"
+	@echo -n "  Pass:  "
 	@./scripts/get-gitlab-password.sh 2>/dev/null || echo "Cannot retrieve password"
 	@echo ""
-	@echo "Note: Make sure the ingress is working and port $(HTTP_PORT) is exposed"
+	@echo "ArgoCD:  http://localhost:$(ARGO_PORT)"
+	@echo "  User:  admin"
+	@echo -n "  Pass:  "
+	@./scripts/get-argocd-password.sh 2>/dev/null || echo "Cannot retrieve password"
+	@echo ""
+	@echo "App:     http://localhost:$(HTTP_PORT)"
+	@echo ""
+	@echo "To test v1→v2: Edit bonus/confs/manifests/wii.yaml,"
+	@echo "               commit & push to GitLab, watch ArgoCD sync"
+	@echo ""
 
+logs-argocd:
+	@echo "=== ArgoCD Server Logs ==="
+	@kubectl logs -n argocd -l app.kubernetes.io/name=argocd-server --tail=50
 
-push:
-	@echo "Push to github..."
-	./scripts/install.sh push
-#test:
-#	@./scripts/test.sh
+logs-gitlab:
+	@echo "=== GitLab Webservice Logs ==="
+	@kubectl logs -n gitlab -l app=webservice --tail=50
 
 clean:
 	@echo "Deleting K3D cluster '$(CLUSTER_NAME)'..."
-	k3d cluster delete $(CLUSTER_NAME) 2>/dev/null || echo "Cluster already deleted"
+	@k3d cluster delete $(CLUSTER_NAME) 2>/dev/null || echo "Cluster already deleted"
 	@echo "Cleanup complete!"
 
-.PHONY: help check-k3d install up down start status argocd-ui test clean gitlab
+.PHONY: all check-deps up down start status info logs-argocd logs-gitlab clean
